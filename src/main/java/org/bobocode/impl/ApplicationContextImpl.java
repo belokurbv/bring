@@ -2,15 +2,14 @@ package org.bobocode.impl;
 
 import lombok.SneakyThrows;
 import org.bobocode.annotation.Bean;
+import org.bobocode.annotation.Inject;
 import org.bobocode.api.ApplicationContext;
 import org.bobocode.exception.NoSuchBeanException;
 import org.bobocode.exception.NoUniqueBeanException;
 import org.reflections.Reflections;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.lang.reflect.Field;
+import java.util.*;
 
 import static java.util.stream.Collectors.toMap;
 
@@ -27,13 +26,34 @@ public class ApplicationContextImpl implements ApplicationContext {
 
     @SneakyThrows
     private void init() {
-        Reflections reflections = new Reflections(basePackage);
+        var reflections = new Reflections(basePackage);
         var classes = reflections.getTypesAnnotatedWith(Bean.class);
+        var postProcessingBeans = new HashMap<Object, List<Field>>();
         for (var clazz : classes) {
             var bean = Arrays.stream(clazz.getConstructors()).findAny()
                     .orElseThrow(RuntimeException::new).newInstance();
             var beanName = generateBeanName(clazz);
             beans.put(beanName, bean);
+            postProcessingBeans.put(bean, Arrays.stream(clazz.getDeclaredFields())
+                    .filter(field -> field.isAnnotationPresent(Inject.class))
+                    .toList()
+            );
+        }
+        initPostProcess(postProcessingBeans);
+    }
+
+    @SneakyThrows
+    private void initPostProcess(HashMap<Object, List<Field>> postProcessingBeans) {
+        for (var entry : postProcessingBeans.entrySet()) {
+            for (var field : entry.getValue()) {
+                field.setAccessible(true);
+                var value = field.getAnnotation(Inject.class).value();
+                if (value.isEmpty()) {
+                    field.set(entry.getKey(), getBean(field.getType()));
+                } else {
+                    field.set(entry.getKey(), beans.get(value));
+                }
+            }
         }
     }
 

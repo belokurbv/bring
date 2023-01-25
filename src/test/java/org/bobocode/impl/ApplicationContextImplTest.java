@@ -1,16 +1,17 @@
 package org.bobocode.impl;
 
+import org.bobocode.annotation.Inject;
 import org.bobocode.api.ApplicationContext;
 import org.bobocode.exception.NoSuchBeanException;
 import org.bobocode.exception.NoUniqueBeanException;
 import org.bobocode.impl.sandbox.*;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.testng.annotations.BeforeClass;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ApplicationContextImplTest {
     static ApplicationContext applicationContext;
@@ -51,5 +52,17 @@ class ApplicationContextImplTest {
     void getAllBeans() {
         assertEquals(applicationContext.getAllBeans(ISandbox.class).size(), 2);
         assertEquals(applicationContext.getAllBeans(BennyHill.class).size(), 1);
+    }
+
+    @Test
+    @DisplayName("Fields annotated with @Inject must have a value")
+    void checkAnnotatedFields() throws IllegalAccessException {
+        var bean = applicationContext.getBean(BennyHill.class);
+        var fields = bean.getClass().getFields();
+        for (var field : fields) {
+            if (field.isAnnotationPresent(Inject.class)) {
+                Assertions.assertNotNull(field.get(bean));
+            }
+        }
     }
 }
